@@ -1,0 +1,42 @@
+---
+pagetitle: "Home"
+page-layout: custom
+css: index.css
+
+format: 
+   html:
+     df-print: paged
+     embed-resources: true
+     self-contained-math: true
+---
+
+::: {.hero-banner}
+::: {.content-block}
+
+# Exploratory Data Analysis tool for Limesurvey data
+
+## Get an overview over your sample
+::: {.hero-buttons}
+[Diversity Groups](eda/diversity_groups.html){.btn-action-primary .btn-action .btn .btn-success .btn-lg role="button"}
+
+:::
+
+
+## Explore data and find relationships
+
+::: {.hero-buttons}
+[Visual Analysis Tool](eda/analysis.html){.btn-action-primary .btn-action .btn .btn-success .btn-lg role="button"}
+[Statistical Relationship Priorization](eda/statistical_highlights.html){.btn-action-primary .btn-action .btn .btn-success .btn-lg role="button"}
+
+:::
+
+## Know your survey
+
+::: {.hero-buttons}
+
+[Survey Metadata](eda/survey_metadata.html){.btn-action-primary .btn-action .btn .btn-success .btn-lg role="button"}
+:::
+:::
+:::
+
+

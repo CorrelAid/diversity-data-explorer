@@ -1,0 +1,10 @@
+# logins for supabase
+COOLIFY_NAME='postgres'
+COOLIFY_HOST='0.0.0.0'
+COOLIFY_PORT='1234'
+COOLIFY_USER='username'
+COOLIFY_PASSWORD='password123'
+COOLIFY_DB='databasename'
+
+# optional configuration for data directory - default is 'data/processed_gdpr'
+DATA_DIR="data/processed_gdpr"

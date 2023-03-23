@@ -1,0 +1,24 @@
+---
+title: "Respondents and their Diversity Groups"
+page-layout: full
+anchor-sections: false
+section-divs: false
+toc: false
+search: false
+---
+::: {.content-block}
+
+::: {.hello-quarto .alt-background}
+::: {.content-block}
+
+::: {.hello-quarto-banner}
+Here we could present an overview over the respondents. 
+
+::: 
+
+::: 
+::: 
+:::
+
+
+_todo_

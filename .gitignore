@@ -1,0 +1,17 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.Renviron
+
+data/raw
+data/processed_gdpr
+experiments/quarto-playground_files
+experiments/quarto-playground.html
+/**/data/
+
+/.quarto/
+/_site/
+
+# vscode knits readme to html
+README.html

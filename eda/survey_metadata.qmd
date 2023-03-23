@@ -1,0 +1,295 @@
+---
+title: "Survey Metadata"
+page-layout: full
+anchor-sections: true
+section-divs: false
+css: ../index.css
+toc: true
+toc-level: 2
+search: false
+echo: false
+message: false
+---
+
+```{r meta-compress-fun}
+# import R function. include is for javascript function
+source(here::here("R", "compress-for-ojs.R"))
+```
+
+{{< include ../includes/decompressFromR.qmd >}}
+
+```{r meta-setup}
+#| include: false
+library(readr)
+library(ggplot2)
+library(dplyr)  
+library(knitr)  
+library(reactable)
+
+knit_print.data.frame <- function (x, options, ...) {
+  rmarkdown::paged_table(x, options) |>
+    rmarkdown:::print.paged_df()
+}
+
+registerS3method("knit_print", "data.frame", knit_print.data.frame)
+
+DATA_DIR <- if(Sys.getenv("DATA_DIR") != "") Sys.getenv("DATA_DIR") else "data/processed_gdpr" 
+
+# diversity groups & items
+diversity_items_dict <- readr::read_csv(here::here(DATA_DIR,"diversity_items_labelled.csv"))
+diversity_items_answers_dict <- readr::read_csv(here::here(DATA_DIR, "diversity_answers_dict_en.csv"))
+
+
+# question items
+question_items_dict <- readr::read_csv(here::here(DATA_DIR, "question_items_labelled.csv"))
+
+# for later to show in the subtables
+subquestions <- readr::read_csv(here::here(DATA_DIR, "subquestions_dict_en.csv"))
+question_answer_options <- readr::read_csv(here::here(DATA_DIR, "question_answers_dict_en.csv"))
+
+
+```
+
+# Overall
+
+
+```{r meta-overall-wrangle}
+diversity_items <- diversity_items_dict %>% 
+  distinct(item_id = diversity_item_id, type_major, type_minor) %>% 
+  mutate(item_type = "diversity",
+         is_diversity_item = TRUE)
+
+question_items_min <- question_items_dict %>% 
+  distinct(item_id = question_item_id, type_major, type_minor) %>% 
+  mutate(item_type = "questionnaire",
+         is_diversity_item = FALSE)
+
+all_items <- dplyr::bind_rows(diversity_items, question_items_min)
+```
+
+The survey contains `r nrow(all_items)` items with...
+
+- ... `r nrow(all_items[all_items$is_diversity_item, ])` items covering the diversity dimensions
+- ... `r nrow(all_items[!all_items$is_diversity_item, ])` items representing the rest
+
+Question types by part of questionnaire: 
+
+
+```{r}
+ojs_define(all_items_ojs = compress_for_ojs(jsonlite::toJSON(all_items)))
+```
+
+
+```{ojs, data-preprocessing} 
+import { aq, op } from '@uwdata/arquero'
+Plotly = require("https://cdn.plot.ly/plotly-latest.min.js");
+```
+
+```{ojs}
+//| include: false 
+// data preprocessing with arquero
+all_items = decompressFromR(all_items_ojs)
+grouped = aq.from(all_items)
+  .groupby('item_type', 'type_major')
+  .rollup({
+    count: op.count()
+   })
+   .ungroup()
+   .groupby('type_major')
+   
+// https://uwdata.github.io/arquero/api/table#output
+// partitions gives us an array of arrays where each array contains the indices of the rows belonging
+// to that group
+traces = grouped.partitions().map((partition) =>  {
+    return {
+    name: grouped.get("type_major", partition[0]), // only the first element because we need a string
+    type: "bar",
+    x: partition.map(index => grouped.get("item_type", index)), // need an array so we loop over the indices 
+    y: partition.map(index => grouped.get("count", index))
+    }
+  }
+)
+
+
+options = ({
+  title: "Question types by item type", // TODO: left align
+  barmode: "group" // "group", "stack", "relative"
+})
+
+
+
+Plotly.newPlot('plot-question-types', traces, options);
+```
+
+
+::: {#plot-question-types}
+:::
+
+
+# Questions
+
+:::{.callout-note}
+This table shows all the questions in the survey that are _not_ questions covering the diversity dimensions. You can show the answer options and the "subquestions" by clicking on the dropdown. You can also filter single columns or do a global search in the whole table.
+:::
+
+
+
+```{r meta-questions-table}
+#questions <- question_items_dict %>%
+ # left_join(question_items, by = "question_item_id") %>%
+questions <- question_items_dict %>%  
+  select(question_item_id,
+         question_group_id,
+         type_major,
+         type_minor,
+         lang,
+         label_major)
+
+
+reactable(
+  questions,
+  details = function(index) {
+    if (questions$type_major[index] == "Numeric") {
+      return(
+        htmltools::div(
+          style = "padding: 1rem",
+          "Numeric questions do not have answer options nor subquestions."
+        )
+      )
+    }
+    
+    answer_options <- question_answer_options %>%
+      filter(question_item_id == questions$question_item_id[index] &
+               lang == questions$lang[index]) %>% 
+      select(-question_item_id, -lang)
+    
+    answer_options_div <- htmltools::div(style = "padding: 1rem",
+                                         reactable(answer_options, outlined = TRUE))
+    
+    if (questions$type_major[index] %in% c("Multiple Choice", "Matrix")) {
+      subq <- subquestions %>%
+        filter(question_item_id == questions$question_item_id[index] &
+                 lang == questions$lang[index]) %>% 
+        select(-question_item_id, -lang)
+      
+      subq_div <- htmltools::div(style = "padding: 1rem",
+                                 reactable(subq, outlined = TRUE))
+      # combine both divs
+      both_divs <- htmltools::div(answer_options_div, subq_div)
+    } else {
+      return(answer_options_div)
+    }
+    
+  },
+  defaultColDef = colDef(
+    header = function(value) gsub("_", " ", value, fixed = TRUE)),
+  columns = list(
+    question_item_id = colDef(minWidth = 10),
+    question_group_id = colDef(minWidth = 10),
+    type_major = colDef(minWidth = 15),
+    type_minor = colDef(minWidth = 8),
+    lang = colDef(minWidth = 7), 
+    label_major = colDef(minWidth = 50)  # overrides the default
+  ),
+  searchable = TRUE,
+  filterable = TRUE,
+  resizable = TRUE
+)
+```
+
+
+# Diversity dimensions
+
+
+## Diversity Groups
+
+The diversity dimensions that are covered in this survey and their labels in different languages. 
+
+```{r meta-diversity-groups-table}
+#| echo: false
+diversity_items_dict %>% 
+   reactable(filterable = TRUE)
+```
+
+
+## Diversity items
+
+:::{.callout-note}
+This chart shows how many questions are associated to each diversity dimension. Most dimensions are only covered by one question but some have two. You can explore individual items in the table below.
+:::
+
+```{r}
+items_dimensions <- diversity_items_dict %>% 
+  distinct(diversity_group_id, diversity_item_id) 
+
+ojs_define(items_dimensions_ojs = compress_for_ojs(jsonlite::toJSON(items_dimensions)))
+```
+
+```{ojs}
+//| include: false
+items_dimensions = decompressFromR(items_dimensions_ojs)
+
+items_per_dimension = aq.from(items_dimensions)
+  .groupby('diversity_group_id')
+  .rollup({
+    count: op.count()
+   })
+
+trace_ipd = ([
+  {
+  x: items_per_dimension.array("diversity_group_id"),
+  y: items_per_dimension.array("count"),
+  type: "bar"
+  }
+])
+
+options_ipd = ({
+  title: "Number of items by diversity dimension", // TODO: left align
+})
+
+
+
+div = Plotly.newPlot('plot-items-per-dimension', trace_ipd, options_ipd);
+```
+
+::: {#plot-items-per-dimension}
+:::
+
+:::{.callout-note}
+This table shows the individual items in all their translations. You can use the dropdown to show the answer options for each question. 
+:::
+
+:::{.callout-warning}
+This table can only show answer options for single choice questions. Right now, all questions are single choice. If there were ever matrix or multiple choice questions, code would need to be adapted. 
+:::
+
+
+```{r meta-diversity-items-table}
+reactable(
+  diversity_items_dict,
+  details = function(index) {
+    if (diversity_items_dict$type_major[index] == "Numeric") {
+      return(
+        htmltools::div(
+          style = "padding: 1rem",
+          "Numeric questions do not have answer options nor subquestions."
+        )
+      )
+    }
+    
+    answer_options <- diversity_items_answers_dict %>%
+      filter(diversity_item_id == diversity_items_dict$diversity_item_id[index] &
+               lang == diversity_items_dict$lang[index]) %>% 
+      select(-diversity_item_id, -lang)
+    
+    answer_options_div <- htmltools::div(style = "padding: 1rem",
+                                         reactable(answer_options, outlined = TRUE))
+    answer_options_div  
+  }, 
+  defaultColDef = colDef(
+    header = function(value) gsub("_", " ", value, fixed = TRUE)),
+  searchable = TRUE,
+  filterable = TRUE
+)
+```
+

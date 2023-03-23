@@ -1,0 +1,42 @@
+---
+title: "EDA Workflow"
+title-meta-heading: FALSE
+author: "Torben" 
+format: html
+editor: visual
+---
+
+## EDA Definition - Wikipedia
+
+**Exploratory data analysis (EDA)** is an approach of analyzing data sets to **summarize** their main characteristics, often using statistical graphics and other **data visualization methods**. A statistical model can be used or not, but primarily EDA is for **seeing what the data can tell us beyond the formal modeling** and thereby contrasts traditional hypothesis testing.
+
+The objectives of EDA are according to Tuckey (1970):
+
+-   **Enable unexpected discoveries in the data**
+-   Suggest hypotheses about the causes of observed phenomena
+-   Assess assumptions on which statistical inference will be based
+-   Support the selection of appropriate statistical tools and techniques
+-   Provide a basis for further data collection through surveys or experiments
+
+## Data Wrangling
+
+-   Daten für die Analyse und Visualisierung aufbereiten, säubern, pivotieren, aggregieren, 5/7 Number-Statistics berechnen. Komplexe Interaktionen darstellen.
+    -   [dplyr (tidyverse)](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf)
+
+## Visualisierung
+
+-   Erstellen univariater, bivariater und multivariater Visualisierungen.
+    -   [ggplot2 (tidyverse)](https://www.maths.usyd.edu.au/u/UG/SM/STAT3022/r/current/Misc/data-visualization-2.1.pdf)
+    -   [plotly (für interaktive Grafiken)](https://plotly.com/r/)
+
+## Automatisierung / Parametrisierung
+
+-   identische / repetitive Arbeitsabläufe in Code überführen, wiederkehrende Analysen standardieren
+    -   [purrr (tidyverse)](https://evoldyn.gitlab.io/evomics-2018/ref-sheets/R_purrr.pdf)
+    -   [Quarto - Parametrisierung](https://quarto.org/docs/computations/parameters.html)
+
+## Reporting
+
+-   visuell ansprechende Reportings, geeignet für Automatierung, eventuell Möglichkeiten für interaktive Nutzung, eigene Exploration durch Anwender:in.
+    -   [Quarto](https://quarto.org)
+    -   [Shiny](https://shiny.rstudio.com)

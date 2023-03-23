@@ -1,0 +1,408 @@
+---
+title: "Highlights of Multivariate Analysis"
+format: 
+  html:
+    page-layout: full
+    embed-resources: true
+execute:
+  echo: false
+---
+
+```{ojs}
+//initialize question types
+single_choice = "single_choice"
+multiple_choice = "multiple_choice"
+matrix = "matrix"
+numeric = "numeric"
+
+//initialize sorting types
+original = "original"
+ascending = "ascending"
+descending = "descending"
+```
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+library(readr)
+library(tidyr)
+library(dplyr)
+
+DATA_DIR <- "data/processed_gdpr"
+
+question_chisq_df <- read_rds(here::here(DATA_DIR, "question_chisq_df.rds")) 
+questions <- read_csv(here::here(DATA_DIR, "question_items_labelled.csv"))
+question_log_reg_df <- read_rds(here::here(DATA_DIR, "question_log_reg_df.rds"))
+question_pol_reg_df <- read_rds(here::here(DATA_DIR, "question_pol_reg_df.rds"))
+
+question_answers = read_csv(here::here(DATA_DIR, "responses_wide.csv"))
+subquestions = read_csv(here::here(DATA_DIR, "subquestions_dict_en.csv"))
+question_answer_dict = read_csv(here::here(DATA_DIR, "question_answers_dict_en.csv"))
+diversity_items = read_csv(here::here(DATA_DIR, "diversity_items_labelled.csv"))
+diversity_answers_dict = read_csv(here::here(DATA_DIR, "diversity_answers_dict_en.csv"))
+
+# helper mappings (containing data needed for recoding that can't be part of this script because of copyright)
+diversity_group_display_labels <- readr::read_csv(here::here("data/helper/diversity_group_display_labels.csv"))
+term_display_labels <- readr::read_csv(here::here("data/helper/log_ref_term.csv"))
+```
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+ojs_define(question_answers_col = question_answers)
+ojs_define(questions_col = questions)
+ojs_define(subquestions_col = subquestions)
+ojs_define(question_answer_dict_col = question_answer_dict )
+ojs_define(diversity_items_col = diversity_items )
+ojs_define(diversity_answers_dict_col = diversity_answers_dict )
+
+```
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+# join labels for display
+question_chisq_df <- question_chisq_df %>%
+  left_join(diversity_group_display_labels, by = "diversity_group") %>% 
+  select(-diversity_group) %>% 
+  rename(diversity_group = diversity_group_new)
+
+question_chisq_df <- question_chisq_df %>% 
+  left_join(questions, by = c("question_item_id")) %>%
+  rename(label_major_x = label_major.x,
+         label_major_y = label_major.y)
+
+ojs_define(question_chisq_col = question_chisq_df)
+```
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+# join labels for display
+question_log_reg_df <- question_log_reg_df %>%
+  left_join(term_display_labels, by = "term") %>% 
+  select(-term) %>% 
+  rename(term = term_new)
+
+
+ojs_define(question_log_reg_col = question_log_reg_df)
+```
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+# join labels for display
+question_pol_reg_df <- question_pol_reg_df %>%
+  left_join(term_display_labels, by = "term") %>% 
+  select(-term) %>% 
+  rename(term = term_new)
+
+ojs_define(question_pol_reg_col = question_pol_reg_df)
+
+```
+#### Influence of Diversity Group on Answer Patterns
+
+The first plot shows the Cramer's V (X-Axis) for each diversity group (Y-Axis) in the selected answer. The Cramer's V statistic is a **measure of association used in contingency tables**, in this case as an effect size measure for chi-square tests. It is used to assess the strength of the association between two categorical variables. The Cramer's V ranges between 0 and 1, with 0 indicating no association and 1 indicating a perfect association.
+
+A common way to interpret the Cramer's V value is to use the following guidelines:
+
+- A Cramer's V value of 0.1 or less is considered a weak association
+- A Cramer's V value between 0.1 and 0.3 is considered a moderate association
+- A Cramer's V value of 0.3 or higher is considered a strong association.
+
+So, for the pre-selected example we could say:
+
+*Voluntary work in the last 12 months seems to be associated mostly with age, impairment, community size and migration background. Overall though, the associations seem rather weak.*
+
+It's important to notice that Cramer's V is **sensitive to sample size**, meaning that as the sample size increases, the Cramer's V value will decrease. It is also worth noting that, when comparing the association strength between different contingency tables, it is important to take into account the number of categories for each variable. **The more categories a variable has, the higher the maximum value of Cramer's V will be**. Please bear also in mind that Cramer's V does not give a *direction* of the effect but indicates the amount of divergence from a contingency table we would expect if there were no relation between the two categorical variables. 
+
+Yet, in our case **we do not intend to make rigorous statistical claims**, but rather use Cramer's V as a rough detection measure of divergent answer patterns. 
+
+The second plot shows the coefficients results of a logistic regression of all diversity groups on each answer, or a ordinal regression in case the answer has more than two categories. 
+
+A positive coefficient indicates that the log odds of the dependent variable is higher for the corresponding category compared to the reference category. The reference category is either the 'lowest/smallest' value of the diversity group (income, education, age) or the group where the respondents denied the answer (refugee, single parent). In cases like gender or residence it is the *normative* group (Cis-Male, West). On the other hand, a negative coefficient suggests that the log odds of the dependent variable is lower for the corresponding category compared to the reference category.
+
+Just like with continuous independent variables, the magnitude of the coefficient reflects the strength of the relationship between the categorical independent variable and the log odds of the dependent variable. Larger coefficients indicate a stronger relationship, while smaller coefficients indicate a weaker relationship.
+
+For questions with more than two answer options and ordinal answer types (e.g. rather not, partly, largely) we used a **Cumulative Link Model (CLM)**. To understand this model better, Let's say we have a CLM with a dependent variable representing the severity of a medical condition (e.g., mild, moderate, severe) and an independent variable representing gender. The coefficient for gender in this model represents the change in the log-odds of moving up one level in the severity variable for a change from the reference group to the other group in the gender variable, holding all other variables in the model constant.
+
+Assuming the reference group is male, the coefficient for gender will represent the difference in the log-odds of moving up one level in the severity variable for females or TIN* compared to males. For example, if the coefficient for gender is 0.5, this means that the log-odds of moving up one level in severity are 0.5 units higher for females than for males, holding all other variables constant.
+
+To interpret this result in a more intuitive way, we can exponentiate the coefficient to obtain an odds ratio. For example, if the exponentiated coefficient is 1.65, this means that the odds of moving up one level in severity are 1.65 times higher for females than for males, holding all other variables constant.
+
+It's important to note that the interpretation of the coefficient for a categorical variable like gender depends on the choice of reference group. If the reference group were female instead of male, the interpretation would be different, and the odds ratio would represent the change in odds for males compared to females or TIN*. Therefore, it's important to choose the reference group carefully and interpret the results accordingly.
+
+
+```{ojs}
+question_chisq = transpose(question_chisq_col)
+question_log_reg = transpose(question_log_reg_col)
+question_pol_reg = transpose(question_pol_reg_col)
+
+question_answers = transpose(question_answers_col);
+questions = transpose(questions_col);
+subquestions = transpose(subquestions_col);
+question_answer_dict = transpose(question_answer_dict_col);
+diversity_items = transpose(diversity_items_col);
+diversity_answers_dict = transpose(diversity_answers_dict_col);
+
+//question_answers
+```
+
+# Question Filter
+
+```{ojs}
+//| panel: input
+viewof question_select = Inputs.select(question_chisq, 
+  {format: d => '(' + d.subquestion_id + ') ' + d.label_major_y + ': ' +  d.label_major_x, sort:true, unique:true}, {label: "Question:"}
+)
+
+// viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
+
+
+
+```
+
+
+
+```{ojs}
+//filter selected question
+filteredChisqData = question_chisq.filter(d => d.subquestion_id === question_select.subquestion_id);
+
+filteredLogRegData = question_log_reg.filter(d => d.subquestion_id === question_select.subquestion_id);
+
+
+filteredPolRegData = question_pol_reg.filter(d => d.subquestion_id === question_select.subquestion_id);
+
+```
+
+## Plot Subquestions
+
+```{ojs}
+Plotly = require("https://cdn.plot.ly/plotly-latest.min.js");
+// Tidy = require("https://www.unpkg.com/@tidyjs/tidy/dist/umd/tidy.min.js");
+{
+
+filteredChisqData.sort((a, b) => (a.cramer_v > b.cramer_v) ? 1 : -1)
+
+let caption_array = filteredChisqData.map(function(d) { return d.label_major_y; });
+
+let caption_text = caption_array[0]
+
+const wrapWidth = 80;
+
+
+const wrappedText = caption_text.split(/\s+/g).reduce((lines, rawWord) => {
+    const words = rawWord.split(' ');
+    let currentLine = lines.slice(-1)[0];
+    while (words.length) {
+        const nextWord = words.shift();
+        if (`${currentLine} ${nextWord}`.length > wrapWidth) {
+            lines.push(nextWord);
+            currentLine = nextWord;
+        } else {
+            currentLine += ` ${nextWord}`;
+            lines.splice(-1, 1, currentLine);
+        }
+    }
+    return lines;
+}, ['']).join('<br>');
+  
+
+
+var trace = {
+      y: filteredChisqData.map(function(d) { return d.diversity_group; }),
+      x: filteredChisqData.map(function(d) { return d.cramer_v; }),
+      type: 'scatter',
+      mode: 'markers',
+      marker: {
+          size: filteredChisqData.map(function(d) { return d.cramer_v; }),
+          sizemode: 'diameter',
+          sizeref: 0.1,
+          sizemin: 4
+    }
+};
+
+  const layout = {
+  height: 800,
+  width: 700,
+  margin: {
+    l: 150,
+    r: 50,
+    b: 150,
+    t: 100,
+    pad: 4
+  },
+  yaxis: {
+    tickmode: "array",
+    title: "Diversity Group",
+    tickvals: filteredChisqData.map(function(d) { return d.diversity_group; }),
+    tickangle: -20,
+  },
+  xaxis: {
+    title: "Cramer V",
+    titlefont: {size: 18, color: "blue"},
+    tickfont: {size: 14, color: "black"}
+  },
+  title: filteredChisqData[0].label_major_x,
+  annotations: [
+    {
+      text: wrappedText,
+      textangle: 0,
+      x: 0,
+      y: -0.15,
+      yanchor: "top",
+      v: 0,
+      align: "left",
+      xref: "paper",
+      yref: "paper",
+      showarrow: false
+    }
+  ]
+}
+
+
+  const chart = DOM.element('chart');
+    Plotly.newPlot(chart, [trace], layout);
+    return chart;
+
+
+}
+```
+
+```{ojs}
+{
+
+if (filteredLogRegData.length > 0 & filteredPolRegData.length === 0) {
+
+    var plotData = filteredLogRegData;
+    
+  
+  } else {
+    
+    var plotData = filteredPolRegData;
+    
+    
+  }
+  
+
+plotData.sort((a, b) => (a.estimate > b.estimate) ? 1 : -1)
+const estimateValues = plotData.map(function(d) { return d.estimate; });
+const maxXValue = Math.max(...estimateValues) + 1;
+const minXValue = Math.min(...estimateValues) - 1;
+
+var trace = {
+      y: plotData.map(function(d) { return d.term; }),
+      x: plotData.map(function(d) { return d.estimate; }),
+      type: 'scatter',
+      mode: 'markers',
+      marker: {
+          size: 6,
+          sizemode: 'diameter',
+          sizeref: 0.1,
+          sizemin: 4
+    }
+};
+
+
+
+  const layoutTwo = {
+    height: 800,
+    width: 700,
+    margin: {
+      l: 150,
+      r: 50,
+      b: 150,
+      t: 100,
+      pad: 4
+      },
+    yaxis: {
+      tickmode: "array",
+      title: "Diversity Subgroup",
+      tickvals: plotData.map(function(d) { return d.term; }),
+      tickangle: -20,
+    },
+    xaxis: {
+      title: "Estimate",
+      titlefont: {size: 18, color: "blue"},
+      tickfont: {size: 14, color: "black"},
+      range: [minXValue, maxXValue]
+    },
+  };
+
+
+
+  const chartTwo = DOM.element('chart');
+    Plotly.newPlot(chartTwo, [trace], layoutTwo);
+    return chartTwo;
+
+}
+
+```
+
+# Diversity Filter
+
+```{ojs}
+//| panel: input
+viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
+
+viewof cramer_v_select = Inputs.range([0, 1], {value: 0.3, step: 0.01, label: "Cramer V"})
+
+
+
+```
+
+```{ojs}
+//filter selected question
+filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select);
+```
+
+## Plot Diversity Groups
+
+```{ojs}
+{
+
+filteredChisqData_div.sort((a, b) => (b.cramer_v > a.cramer_v) ? 1 : -1)
+
+var trace_div = {
+      x: filteredChisqData_div.map(function(d) { return d.subquestion_id; }),
+      y: filteredChisqData_div.map(function(d) { return d.cramer_v; }),
+      type: 'scatter',
+      mode: 'markers',
+      marker: {
+          size: filteredChisqData_div.map(function(d) { return d.cramer_v; }),
+          sizemode: 'diameter',
+          sizeref: 0.1,
+          sizemin: 4
+    }
+};
+
+  const layout_div = {
+  height: 1000,
+  width: 746,
+  margin: {
+    l: -50,
+    r: -50,
+    b: 150,
+    t: 100,
+    pad: 2
+  },
+  yaxis: {
+    tickmode: "array",
+    title: "Cramer V",
+    tickvals: filteredChisqData_div.map(function(d) { return d.subquestion_id; }),
+  },
+  xaxis: {
+    title: "Subquestion ID",
+    titlefont: {size: 18, color: "blue"},
+    tickfont: {size: 8, color: "black"},
+    tickangle: -20,
+    dtick: 2
+  },
+  title: filteredChisqData_div[0].diversity_group,
+}
+
+
+  const chart_div = DOM.element('chart');
+    Plotly.newPlot(chart_div, [trace_div], layout_div);
+    return chart_div;
+
+
+}
+```
+
+
+
+

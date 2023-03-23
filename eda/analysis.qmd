@@ -1,0 +1,620 @@
+---
+title: "Visual Analysis Tool"
+format: 
+  html:
+    page-layout: full
+    embed-resources: true
+    toc: false
+execute:
+  echo: false
+---
+
+```{ojs}
+// initialize question types
+single_choice = "single_choice"
+multiple_choice = "multiple_choice"
+matrix = "matrix"
+numeric = "numeric"
+
+// initialize sorting types
+original = "original"
+ascending = "ascending"
+descending = "descending"
+```
+
+```{r univ-compress-fun}
+# import R function. include is for javascript function
+source(here::here("R", "compress-for-ojs.R"))
+```
+{{< include ../includes/decompressFromR.qmd >}}
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+library(readr)
+library(tidyr)
+library(dplyr)
+library(reactable)
+
+DATA_DIR <- if(Sys.getenv("DATA_DIR") != "") Sys.getenv("DATA_DIR") else "data/processed_gdpr" 
+
+question_answers = read_csv(here::here(DATA_DIR, "responses_wide.csv"))
+ojs_define(question_answers_col = question_answers)
+
+questions = read_csv(here::here(DATA_DIR, "question_items_labelled.csv"))
+ojs_define(questions_col = compress_for_ojs(jsonlite::toJSON(questions)))
+
+subquestions = read_csv(here::here(DATA_DIR, "subquestions_dict_en.csv"))
+ojs_define(subquestions_col = compress_for_ojs(jsonlite::toJSON(subquestions)))
+
+question_answer_dict = read_csv(here::here(DATA_DIR, "question_answers_dict_en.csv"))
+ojs_define(question_answer_dict_col = compress_for_ojs(jsonlite::toJSON(question_answer_dict)))
+
+diversity_items = read_csv(here::here(DATA_DIR, "diversity_items_labelled.csv"))
+ojs_define(diversity_items_col = compress_for_ojs(jsonlite::toJSON(diversity_items)))
+
+diversity_answers_dict = read_csv(here::here(DATA_DIR, "diversity_answers_dict_en.csv"))
+ojs_define(diversity_answers_dict_col = compress_for_ojs(jsonlite::toJSON(diversity_answers_dict)))
+
+colors = read_csv(here::here("plotly_colors.csv"))
+ojs_define(colors_col = compress_for_ojs(jsonlite::toJSON(colors)))
+```
+
+```{ojs}
+//| output: false
+import { aq, op } from '@uwdata/arquero'
+
+ojs_question_answers =transpose(question_answers_col);
+question_answers = aq.from(ojs_question_answers);
+
+questions=decompressFromR(questions_col);
+subquestions=aq.from(decompressFromR(subquestions_col));
+question_answer_dict=aq.from(decompressFromR(question_answer_dict_col));
+
+diversity_items = aq.from(decompressFromR(diversity_items_col));
+diversity_answers_dict = aq.from(decompressFromR(diversity_answers_dict_col));
+
+colors = decompressFromR(colors_col);
+```
+
+## Question and Diversity Group
+
+::: {.custom-forms}
+```{ojs}
+//| panel: input
+// input for question selection
+
+viewof question_search = Inputs.search(questions, { label: "Filter Questions:", autocomplete: true, placeholder: "Search question labels", width: "100%", format: (n_result) => { return `${n_result} matching questions found.` } })
+
+has_question_search_results = question_search == undefined || question_search.length === 0 ? false : true
+
+viewof question_select = Inputs.select(has_question_search_results ? question_search : questions, 
+  {sort: true, unique: true, format: d => '(' + d.question_item_id + ')' + d.label_major, label: "Question:"}
+)
+// input for diversity group selection
+// dropdown values 
+diversity_choice = diversity_items
+ .rename({'label_long': 'label' })
+ .select('label', 'diversity_group_id')
+ .dedupe() // 2 groups have more than one item - remove duplicate rows
+ .objects()
+ 
+viewof diversity_group_select = Inputs.select(diversity_choice, 
+  {sort: true, unique: true, format: d => d.label, label: "Diversity Group:"}
+)
+// input for diversity item selection
+// values of dropdown depend on which diversity group is selected
+filtered_diversity_items = diversity_items
+  .filter(aq.escape(d => op.equal(d.diversity_group_id, diversity_group_select.diversity_group_id))) // aq.escape because we use value from filter
+  .objects()
+  
+viewof diversity_items_select = Inputs.select(filtered_diversity_items, 
+      {sort: true, unique: true, format: d => d.diversity_item_id, label: "Diversity Item:"})
+// extract the id of the selected diversity item to make filtering easier later
+diversity_items_select_id = diversity_items_select.diversity_item_id
+```
+:::
+
+#### Optional filter for values of a secondary Diversity Group
+
+::: {.custom-forms}
+```{ojs}
+//| panel: input
+// input for secondary diversity group == filter for plotted data
+viewof diversity_group_select_filter = Inputs.select(diversity_choice, 
+  {sort: true, unique: true, format: d => d.label, label: "Diversity Group to Filter:"}
+)
+
+// input for secondary diversity item selection
+// dropdown values depend on the selected diversity group 
+filtered_diversity_items_filter = diversity_items
+  .filter(aq.escape(d => op.equal(d.diversity_group_id, diversity_group_select_filter.diversity_group_id))) // aq.escape because we use value from filter
+  .objects()
+
+viewof diversity_items_select_filter = Inputs.select(filtered_diversity_items_filter, 
+      {sort: true, unique: true, format: d => d.diversity_item_id, label: "Diversity Item to Filter:"})
+
+// checkbox input to select the categories of the variable we want to filter 
+diversity_answer_labels_dict_filter = diversity_answers_dict
+  .filter(aq.escape(d => op.equal(d.diversity_item_id, diversity_items_select_filter.diversity_item_id )))
+  .objects({ columns: ["label", "value"], grouped: 'entries' })
+
+// checkbox needs a map format, otherwise the preselection via "value" argument doesn't work?!
+diversity_answer_labels_dict_filter_map = new Map(diversity_answer_labels_dict_filter.map(o => [o.label, o.value]))
+viewof watching = Inputs.checkbox(diversity_answer_labels_dict_filter_map, {value: diversity_answer_labels_dict_filter_map.values(), label: "Show selected:" }) 
+
+// id for easier filtering etc. 
+diversity_items_select_id_filter =  diversity_items_select_filter.diversity_item_id 
+```
+
+<!-- Filtering data by input choices -->
+```{ojs}
+//| output: false
+// get selected question
+filtered_questions = questions.filter(function(question) {
+  return question_select.question_item_id == question.question_item_id;
+})
+
+// set question type (enum) of selected question for data wrangling later
+question_type =  {
+  if(question_select.type_major == "Single Choice"){
+        return single_choice;
+  }else if(question_select.type_major == "Multiple Choice"){
+        return multiple_choice;
+  }else if(question_select.type_major == "Matrix"){
+        return matrix;
+  }else if(question_select.type_major == "Numeric"){
+        return numeric;
+  }else{
+        return "NA";
+  }
+}
+```
+
+```{ojs}
+//| output: false
+// SUBQUESTIONS
+// determine question details: subquestion information
+subquestion_items = subquestions.filter(aq.escape((sq) => question_select.question_item_id == sq.question_item_id))
+available_subquestion_answers = question_answers.columnNames() //filter out only target columns for which answers are available
+reduced_subquestion_items = subquestion_items.filter(aq.escape(sq => available_subquestion_answers.indexOf(sq.subquestion_id) > -1))
+
+//reduced_subquestion_items.objects()
+subquestion_ids = reduced_subquestion_items.array("subquestion_id");
+
+// determine subquestion text
+subquestion_labels_dict = {
+  var labels = {}
+  reduced_subquestion_items.objects().forEach(function(item){
+    labels[item.subquestion_id] = item.label_major
+  })
+  return labels
+}
+```
+
+```{ojs}
+//| output: false
+// QUESTION ANSWERS
+// determine question details: answer options
+answer_labels = question_answer_dict.filter(aq.escape((a) => question_select.question_item_id == a.question_item_id))
+
+answer_labels_dict = {
+  var labels = {}
+  answer_labels.objects().forEach(function(item){
+    labels[item.answer_id] = item.answer_text
+  })
+  return labels
+}
+```
+
+```{ojs}
+//| output: false
+// DIVERSITY ANSWERS
+// determine diversity details: diversity answer options
+diversity_answer_labels =diversity_answers_dict.filter(aq.escape((a) => diversity_items_select_id == a.diversity_item_id))
+
+diversity_answer_labels_dict = {
+  var labels = {}
+  diversity_answer_labels.objects().forEach(function(item){
+    labels[item.value] = item.label
+  })
+  return labels
+}
+
+```
+
+```{ojs}
+// RESTRUCTURE AND FILTER ANSWER DATA
+// answer columns to keep (subquestion answers & answers for selected diversity groups)
+target_column_ids = ['respondent_id'].concat(subquestion_ids.concat([diversity_items_select_id,diversity_items_select_id_filter]))
+
+// select columns of interest
+// entries in result: {respondent_id: xx; subquestion1: answer, subquestion2: answer, ..., diversityItem1: answer, diversityItem2: answer}
+filtered_questions_answers_by_subquestion = question_answers.select(target_column_ids)
+
+// only keep answers of diversity groups selected via secondary diversity group checkbox
+filtered_questions_answers = filtered_questions_answers_by_subquestion.filter(aq.escape((a) => watching.includes(a[diversity_items_select_id_filter])));
+
+// filter for valid questions: assumption: answer is invalid only if all subquestion answers are undefined
+valid_filtered_question_answers = filtered_questions_answers.filter(aq.escape((a) => {
+  let valid = false
+  subquestion_ids.forEach(subquestion_id => {
+    if(a[subquestion_id] != undefined) {valid = true}
+   })
+  return valid
+}))
+
+
+filtered_question_answers_count = filtered_questions_answers.numRows()
+valid_filtered_question_answers_count = valid_filtered_question_answers.numRows()
+valid_filtered_question_answers_ratio = (valid_filtered_question_answers.numRows()/ filtered_questions_answers.numRows() * 100).toFixed(2)
+
+```
+:::
+
+#### Question Information:
+
+**Question**
+
+${question_select.label_major}
+
+**Question ID**  
+${question_select.question_item_id}
+
+**Question Type**  
+${question_select.type_major}
+
+**Count of Valid Question Answers**  
+${valid_filtered_question_answers_count} of 
+${filtered_question_answers_count} answers  
+(
+${valid_filtered_question_answers_ratio}
+%)
+
+**Answer Options**
+```{ojs}
+answer_labels_for_output = { return (question_type == single_choice) ?  answer_labels_dict : subquestion_labels_dict} 
+// check lengths of labels --> if maximal length > 40 ==> set flag to include only label id in plot
+longest_answer_label = Object.values(answer_labels_for_output).reduce(
+    function (a, b) {
+        return a.length > b.length ? a : b;
+    }
+);
+include_full_labels_plot = { return (longest_answer_label.length) <= 20 }
+// restructure for printing as table:
+answer_labels_for_output_table = Object.entries(answer_labels_for_output).map(([answer_id, label]) => ({ answer_id, label}))
+// answer_labels_for_output_table
+Inputs.table(answer_labels_for_output_table)
+```
+
+<!-- Counting answers based on type of question -->
+```{ojs}
+diversity_groups = {
+  // get diversity items as list and add "ALL" 
+  var diversity_groups = Object.values(diversity_answer_labels_dict);
+  diversity_groups.push("All");
+  return diversity_groups
+}
+
+// filter questions containing diversity group item i
+all_groups_answers = diversity_groups.map(diversity_item => 
+      diversity_item == "All" ? {"name": diversity_item, "answers": valid_filtered_question_answers} : 
+      {"name": diversity_item, "answers": valid_filtered_question_answers.filter(aq.escape((x) => diversity_answer_labels_dict[x[diversity_items_select_id]]== diversity_item))}
+)
+
+answer_data = {
+  var answer_data = []
+  all_groups_answers.forEach(group_answers => {
+  
+    if(question_type == single_choice){
+        // count for each included answer option (different number possible e.g. 0, 1, 98)
+      var answer_count =  []
+      subquestion_ids.forEach(function(sq){
+          var choice_count = group_answers.answers
+            .groupby(sq)
+            .count()
+            .objects()
+          //save all additional data in dict per subquestion answer
+          choice_count.forEach(count_item => {
+            answer_data.push({"answer": count_item[sq], 
+              "count": count_item["count"], 
+              "name": group_answers.name, 
+              "label": include_full_labels_plot ? answer_labels_dict[count_item[sq]] : count_item[sq]
+            })
+          })
+      })
+      
+    } else if(question_type == multiple_choice){
+      // each choice is one subquestion with answer possibilities Yes(1)/No(0) -> for each option (subquestion) count of Yes (1)
+      var subquestion_num = -1;
+      subquestion_ids.forEach(sq => {
+          var choice_count = group_answers.answers
+            .groupby(sq)
+            .count()
+            .objects()
+
+          if (choice_count.length > 0){
+            var yes_count = choice_count.filter(a => a[sq] == 1)
+            
+            subquestion_num += 1; //this is just so that categories appear in the same order as the labels
+            answer_data.push({"answer": sq, 
+            "label": include_full_labels_plot ? subquestion_labels_dict[sq]: sq, 
+            "count": yes_count.length > 0 ? yes_count[0]['count'] : 0, 
+            "order": subquestion_num,      
+            "name": group_answers.name
+            })
+          }
+       })
+    } else if(question_type == matrix){
+       var subquestion_num = -1;
+       
+       subquestion_ids.forEach(sq => {
+         var choice_count = group_answers.answers
+            .groupby(sq)
+            .count()
+            .objects()
+            
+            var non_undefined_count = choice_count.filter(a => a[sq] != undefined)
+            if (non_undefined_count.length > 0){ //filter out undefined answers
+              subquestion_num += 1; 
+              non_undefined_count.forEach(count_item => {
+                answer_data.push({"answer": count_item[sq], 
+                  "count": count_item["count"], 
+                  "name": group_answers.name, 
+                  "label": include_full_labels_plot ? subquestion_labels_dict[sq]: sq,
+                  "order": subquestion_num, 
+                })
+              })
+            }
+       })
+          
+    } else if(question_type == numeric){
+         answer_data.push({"answer": question_select.label_major, 
+            "label": include_full_labels_plot ? question_select.label_major : subquestion_ids[0], 
+            "boxplot": group_answers.answers.array(subquestion_ids[0]), 
+            "name": group_answers.name
+        });
+      }
+    }
+  )
+  return answer_data
+}
+```
+\
+
+::: panel-tabset
+## Plot
+```{ojs}
+Plotly = require("https://cdn.plot.ly/plotly-latest.min.js");
+{
+  var subquestion_items = reduced_subquestion_items.objects()
+  //console.log("These are the answer_data");
+  //console.log(answer_data);
+  //console.log("answer_labels_dict");
+  //console.log(answer_labels_dict);
+  
+  if (question_type != "matrix") {
+    //set answer labels (if labels are too long -> use keys instead of labels in plots)
+    var answerLabelsToUse = include_full_labels_plot ? subquestion_items.map(subquestion_item => subquestion_item["label_major"]) : subquestion_items.map(subquestion_item =>  subquestion_item["subquestion_id"]);
+    
+    if(question_type == single_choice) {
+      //for single choice question, labels are answer labels themselves, not subquestion ids
+      answerLabelsToUse = include_full_labels_plot ? Object.values(answer_labels_dict) :                                                              Object.keys(answer_labels_dict);
+    }
+    
+    var data = {};
+    for (var c = 0; c < diversity_groups.length; c++) {
+      var legendName = diversity_groups[c]
+      var answerObjectperAnswerLabel = answer_data.filter(x => x !== undefined && x.name == legendName);
+  
+      var yValues = [];
+      var count = answerLabelsToUse.length
+      for(var i = 0; i < count; i++) {
+        var answerLabelObject = answerObjectperAnswerLabel.filter(x => x["label"] == answerLabelsToUse[i])[0];
+        
+        if(typeof answerLabelObject !== "undefined") {
+           if(question_type == numeric) {
+            yValues.push(answerLabelObject["boxplot"]);
+           } else {
+            yValues.push(answerLabelObject["count"]);
+          }
+        }
+     }
+    
+      //bring everything together in plot
+      if (question_type != numeric){
+        var type = 'bar';
+        var xValues = answerLabelsToUse
+        
+      } else if (question_type == numeric) {
+        //special handling for numeric questions: instead of bars, we create boxplots
+        type = 'box';
+        //there needs to be an xValue for every boxplot entry -> fill array with answer label
+        xValues = []
+        for(var j = 0; j < yValues.length; j++) {
+          var new_x = new Array(yValues[j].length).fill(answerLabelsToUse[j]);
+          xValues = xValues.concat(new_x);
+        }
+        yValues = yValues.flat(1)
+      }
+      
+      var trace = {
+        x:  xValues,
+        y:  yValues,
+        type: type,
+        name: legendName,
+      }
+      trace.marker = {color: colors[c % colors.length]['hexa']}
+      trace.opacity = 0.8
+      if( diversity_groups[c]=="All") {
+        //set specific color for "ALL" bar = grey
+          trace.marker = {color: 'rgb(190,190,190)'}
+      } 
+      data[legendName] = trace;
+      data = Object.keys(data).map(key => {
+          return data[key];
+      })
+    };
+    //console.log("final data before layout")
+    //console.log(data);
+    var layout = {
+      legend: {
+        "title": {
+          "text": diversity_items_select.diversity_item_id
+        }
+      },
+      xaxis: {
+        type: 'category',
+        automargin: true
+      },
+      autosize: false,
+      height: 600,
+      width: 985,
+      xaxis: {
+        automargin: true
+      }
+    }
+    
+    if (question_type != numeric) {
+      layout.barmode = 'group';
+    } else {
+      layout.boxmode = 'group';
+    }
+  
+    const div = DOM.element('div');
+    Plotly.newPlot(div, data, layout);
+    return div
+  } else {
+    //handle matrix questions here -> answer possibilities are 0 - n
+    var subquestionLabels = include_full_labels_plot ? subquestion_items.map(subquestion_item => subquestion_item["label_major"]) : 
+                            subquestion_items.map(subquestion_item => subquestion_item["subquestion_id"]);
+    var subplotTitles = subquestion_items.map(subquestion_item => subquestion_item["label_major"]) 
+    
+    var answerLabelsToUse = Object.values(answer_labels_dict);
+    var answerLabelsToUsKeys = Object.keys(answer_labels_dict);
+    
+    //console.log("subquestion_items")
+    //console.log(subquestion_items)
+    //console.log("answer data")
+    //console.log(answer_data)
+    var data = [];
+    //var divs = []
+    var annotations = [];
+    //for now: do one plot for each subquestion
+    for (var q = 0; q < subquestion_items.length; q++) {
+      //var data = []
+      //console.log(subquestionLabels[q])
+      // first filter for answers to selected subquestion
+      var curr_answer_data = answer_data.filter(x => x["label"] == subquestionLabels[q]);
+      //console.log('answer data for subquestion')
+      //console.log(curr_answer_data)
+    
+      var diversity_totals = {}
+      
+      //get total number of answer per diversity group for calculating percentages
+      for (var c = 0; c < diversity_groups.length; c++) {
+           //get count for each diversity group
+          var legendName = diversity_groups[c]
+          var diversitygroup_answers = curr_answer_data.filter(x => x.name == legendName);
+          diversitygroup_answers = diversitygroup_answers.filter(x => x.answer != "undefined");
+          //console.log("diversitygroup_answers")
+          //console.log(diversitygroup_answers)
+          if (typeof diversitygroup_answers != "undefined"){
+            var total_answers = diversitygroup_answers.map(x => x.count).reduce(function add(accumulator, a) {
+                                        return accumulator + a;
+                                      }, 0)
+            console.log(total_answers)     
+            diversity_totals[c] = total_answers
+          } else {
+            diversity_totals[c] = 0
+          }
+      }
+      //console.log("diversity totals")
+      //console.log(diversity_totals)
+      
+      //filter for each answer possibility
+      var count = answerLabelsToUse.length
+      for(var i = 0; i < count; i++) {
+        var answerObjectperAnswerLabel = curr_answer_data.filter(x => x["answer"] == answerLabelsToUsKeys[i]);
+        
+        var yValues = [];
+        for (var c = 0; c < diversity_groups.length; c++) {
+         //get count for each diversity group
+          var legendName = diversity_groups[c]
+          var answerLabelObject = answerObjectperAnswerLabel.filter(x => x.name == legendName)[0];
+          
+          //console.log("answer label object")
+          //console.log(answerLabelObject)
+          if(typeof answerLabelObject !== "undefined") {
+              yValues.push(answerLabelObject["count"] / diversity_totals[c] *100);
+          } else{
+             yValues.push(0);
+          }   
+        }
+      
+        //bring everything together in trace
+        var trace = {
+          x:  yValues,
+          y: diversity_groups,
+          type: 'bar',
+          name: answerLabelsToUse[i],
+         // marker: {'colors': colors[i % 10]['hexa']},
+          barmode: "stack",
+          xaxis: 'x'+ (q+1),
+          yaxis: 'y'+ (q+1),
+          orientation: 'h',
+          showlegend: (q == 0) ? true : false
+        }
+        
+        trace.marker = {color: colors[i % colors.length]['hexa']}
+        trace.opacity = 0.8
+        
+        data.push(trace);
+        annotations.push(
+          {
+            xref: 'paper',
+            yref: 'paper',
+            x: 0,
+            xref: "x" + (q+1) + " domain",
+            y: 1.1,
+            yref: "y" + (q+1) + " domain",
+            text: subplotTitles[q],
+            showarrow: false
+          }
+        )
+      };
+      
+      var layout = {
+        barmode: 'relative',
+        xaxis: {
+          title: {
+            text: '%',
+          }
+        },
+        margin:{'pad': 20},
+        grid: {rows: subquestion_items.length, columns: 1, pattern: 'independent'},
+        annotations: annotations,
+        height: subquestionLabels.length * 400,
+        width: 700
+      }
+      //console.log(layout)
+    }
+    const div = DOM.element('div');
+    div.classList.add('custom-plotly-chart');
+    Plotly.newPlot(div, data, layout);
+    return div
+  }
+}
+
+```
+## Data
+
+
+::: { .custom-data-chart-container }
+```{ojs}
+//https://github.com/glin/reactable/blob/main/vignettes/quarto/observable-reactable.qmd not working yet....look for other solution
+//Reactable.setData('tbl', filtered_questions_answers)
+viewof filtered_questions_answers_selected = Inputs.search(filtered_questions_answers, { label: "Filter table", placeholder: "Search for any value...", width: "100%"})
+Inputs.table(filtered_questions_answers_selected, { rows: 25.5, maxWidth: 916, height: 564, width: "100%" })
+```
+:::
+
+:::

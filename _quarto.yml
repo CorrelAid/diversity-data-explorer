@@ -1,0 +1,59 @@
+project:
+  type: website
+  output-dir: _site
+  render: 
+      - "*.qmd"
+      - "!includes/"
+      - "!experiments/"
+  preview:
+    port: 7654
+website:
+  title: "EDA Tool"
+  image: "images/logo.png"
+  favicon: "images/favicon.ico"
+  page-footer: 
+    left: |
+      Proudly presented by 
+      [![](https://correlaid.org/images/correlaid/correlaid-icon.svg){fig-alt="correlaid" width=10px}](https://www.correlaid.org)
+    center:
+      - text: "About"
+        href: about.qmd
+  navbar:
+    background: light
+    logo: images/logo.png
+    logo-alt: "Logo of CorrelAid."
+    title: false
+    collapse-below: lg
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "Exploratory Analysis"
+        href: eda/analysis.qmd
+      - text: "About"
+        href: about.qmd
+
+  sidebar:
+    - id: eda
+      collapse-level: 1
+      contents:
+        - text: "Diversity Groups"
+          href: eda/diversity_groups.qmd
+        - text: "Visual Analysis Tool"
+          href: eda/analysis.qmd
+        - text: "Statistical Relationship Priorization"
+          href: eda/statistical_highlights.qmd
+        - text: "Survey Metadata"
+          href: eda/survey_metadata.qmd
+
+format:
+  html:
+    toc: true
+    theme:
+      light: [cosmo, theme.scss]
+    page-layout: full
+    code-copy: true
+    code-overflow: wrap
+    css: styles.css
+    include-after-body: js.html
+    embed-resources: true
+    self-contained-math: true

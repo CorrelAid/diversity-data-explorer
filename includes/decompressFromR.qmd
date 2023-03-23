@@ -1,0 +1,16 @@
+```{ojs}
+buffer = require('https://bundle.run/buffer@6.0.3'); // ~8kb
+```
+
+
+```{ojs}
+zlib = require('https://bundle.run/browserify-zlib@0.2.0'); // ~30kb here we could check whether we can just import inflateSync
+```
+
+
+```{ojs}
+decompressFromR = function (compressed) {
+  var decompressed = zlib.inflateSync(new buffer.Buffer(compressed, 'base64')).toString()
+  return(JSON.parse(decompressed))
+}
+```
