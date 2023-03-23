@@ -11,6 +11,16 @@ Hence, the goal of this project was to find ways to break down the complexity an
 
 To reach those goals, the project team built a prototype for a [quarto website](https://quarto.org/docs/websites/) with different components that address the different goals.
 
+# Screenshots
+![Screenshot 2023-03-23 at 13-31-24 Home](https://user-images.githubusercontent.com/13187448/227226321-3ceebfb6-10a9-446f-bbc9-70276b7d5adc.png)
+
+
+![Screenshot 2023-03-23 at 13-28-46 EDA Tool - Visual Analysis Tool](https://user-images.githubusercontent.com/13187448/227226298-cbe15d6a-12a6-4cfd-ad0d-1bf40501c633.png)
+
+![Screenshot 2023-03-23 at 13-29-27 EDA Tool - Visual Analysis Tool](https://user-images.githubusercontent.com/13187448/227226309-ad384652-7eff-4840-8a41-8add9301154f.png)
+
+Screenshots of other parts of the tool cannot be shared due to copyright claims of our partner organization.
+
 # Contributors
 
 Unfortunately, we had to republish the repository without the old commit history, making the numerous contributions from the project team invisible. Here's the list of people who worked on this project and their contributions:
