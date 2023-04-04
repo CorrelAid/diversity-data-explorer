@@ -93,7 +93,11 @@ question_pol_reg_df <- question_pol_reg_df %>%
 ojs_define(question_pol_reg_col = question_pol_reg_df)
 
 ```
-#### Influence of Diversity Group on Answer Patterns
+
+
+::: {.callout-note collapse="true"}
+
+## Influence of Diversity Group on Answer Patterns
 
 The first plot shows the Cramer's V (X-Axis) for each diversity group (Y-Axis) in the selected answer. The Cramer's V statistic is a **measure of association used in contingency tables**, in this case as an effect size measure for chi-square tests. It is used to assess the strength of the association between two categorical variables. The Cramer's V ranges between 0 and 1, with 0 indicating no association and 1 indicating a perfect association.
 
@@ -124,7 +128,7 @@ Assuming the reference group is male, the coefficient for gender will represent 
 To interpret this result in a more intuitive way, we can exponentiate the coefficient to obtain an odds ratio. For example, if the exponentiated coefficient is 1.65, this means that the odds of moving up one level in severity are 1.65 times higher for females than for males, holding all other variables constant.
 
 It's important to note that the interpretation of the coefficient for a categorical variable like gender depends on the choice of reference group. If the reference group were female instead of male, the interpretation would be different, and the odds ratio would represent the change in odds for males compared to females or TIN*. Therefore, it's important to choose the reference group carefully and interpret the results accordingly.
-
+:::
 
 ```{ojs}
 question_chisq = transpose(question_chisq_col)
@@ -141,7 +145,7 @@ diversity_answers_dict = transpose(diversity_answers_dict_col);
 //question_answers
 ```
 
-# Question Filter
+## Question Filter
 
 ```{ojs}
 //| panel: input
@@ -168,7 +172,7 @@ filteredPolRegData = question_pol_reg.filter(d => d.subquestion_id === question_
 
 ```
 
-## Plot Subquestions
+### Plot Subquestions
 
 ```{ojs}
 Plotly = require("https://cdn.plot.ly/plotly-latest.min.js");
@@ -332,7 +336,7 @@ var trace = {
 
 ```
 
-# Diversity Filter
+## Diversity Filter
 
 ```{ojs}
 //| panel: input
@@ -349,7 +353,7 @@ viewof cramer_v_select = Inputs.range([0, 1], {value: 0.3, step: 0.01, label: "C
 filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select);
 ```
 
-## Plot Diversity Groups
+### Plot Diversity Groups
 
 ```{ojs}
 {
