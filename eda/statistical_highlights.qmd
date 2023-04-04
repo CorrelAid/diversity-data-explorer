@@ -341,13 +341,17 @@ return chartTwo;
 //| panel: input
 viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
 
-viewof cramer_v_select = Inputs.range([0, 1], {value: 0.3, step: 0.01, label: "Cramer V"})
+// calculate max cramer value for filter select
+cramer_vs = question_chisq.filter(d => d.diversity_group === diversity_select).map(obj => obj.cramer_v)
+max_cramer = Math.round(Math.max(...cramer_vs) * 100) / 100
+
+viewof cramer_v_select = Inputs.range([0, max_cramer - 0.001], {value: 0.3, step: 0.01, label: "Cramer V"});
 
 ```
 
 ```{ojs}
 
-//filter selected question
+// filter selected question
 filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select)
 
 ```
