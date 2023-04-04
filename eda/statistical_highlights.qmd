@@ -206,7 +206,7 @@ const wrappedText = caption_text.split(/\s+/g).reduce((lines, rawWord) => {
   
 
 
-var trace = {
+const trace = {
       y: filteredChisqData.map(function(d) { return d.diversity_group; }),
       x: filteredChisqData.map(function(d) { return d.cramer_v; }),
       type: 'scatter',
@@ -219,7 +219,7 @@ var trace = {
     }
 };
 
-  const layout = {
+const layout = {
   height: 800,
   width: 700,
   margin: {
@@ -258,10 +258,9 @@ var trace = {
 }
 
 
-  const chart = DOM.element('chart');
-    Plotly.newPlot(chart, [trace], layout);
-    return chart;
-
+const chart = DOM.element('chart');
+Plotly.newPlot(chart, [trace], layout);
+return chart;
 
 }
 ```
@@ -287,7 +286,7 @@ const estimateValues = plotData.map(function(d) { return d.estimate; });
 const maxXValue = Math.max(...estimateValues) + 1;
 const minXValue = Math.min(...estimateValues) - 1;
 
-var trace = {
+const trace = {
       y: plotData.map(function(d) { return d.term; }),
       x: plotData.map(function(d) { return d.estimate; }),
       type: 'scatter',
@@ -302,7 +301,7 @@ var trace = {
 
 
 
-  const layoutTwo = {
+const layoutTwo = {
     height: 800,
     width: 700,
     margin: {
@@ -328,9 +327,9 @@ var trace = {
 
 
 
-  const chartTwo = DOM.element('chart');
-    Plotly.newPlot(chartTwo, [trace], layoutTwo);
-    return chartTwo;
+const chartTwo = DOM.element('chart');
+Plotly.newPlot(chartTwo, [trace], layoutTwo);
+return chartTwo;
 
 }
 
@@ -344,13 +343,13 @@ viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_grou
 
 viewof cramer_v_select = Inputs.range([0, 1], {value: 0.3, step: 0.01, label: "Cramer V"})
 
-
-
 ```
 
 ```{ojs}
+
 //filter selected question
-filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select);
+filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select)
+
 ```
 
 ### Plot Diversity Groups
@@ -360,7 +359,7 @@ filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversi
 
 filteredChisqData_div.sort((a, b) => (b.cramer_v > a.cramer_v) ? 1 : -1)
 
-var trace_div = {
+const trace_div = {
       x: filteredChisqData_div.map(function(d) { return d.subquestion_id; }),
       y: filteredChisqData_div.map(function(d) { return d.cramer_v; }),
       type: 'scatter',
@@ -373,7 +372,7 @@ var trace_div = {
     }
 };
 
-  const layout_div = {
+const layout_div = {
   height: 1000,
   width: 746,
   margin: {
@@ -399,10 +398,9 @@ var trace_div = {
 }
 
 
-  const chart_div = DOM.element('chart');
-    Plotly.newPlot(chart_div, [trace_div], layout_div);
-    return chart_div;
-
+const chart_div = DOM.element('chart');
+Plotly.newPlot(chart_div, [trace_div], layout_div);
+return chart_div;
 
 }
 ```
