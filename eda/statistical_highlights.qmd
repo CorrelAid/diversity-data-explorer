@@ -131,6 +131,8 @@ It's important to note that the interpretation of the coefficient for a categori
 :::
 
 ```{ojs}
+import { aq, op } from '@uwdata/arquero'
+
 question_chisq = transpose(question_chisq_col)
 question_log_reg = transpose(question_log_reg_col)
 question_pol_reg = transpose(question_pol_reg_col)
@@ -142,15 +144,25 @@ question_answer_dict = transpose(question_answer_dict_col);
 diversity_items = transpose(diversity_items_col);
 diversity_answers_dict = transpose(diversity_answers_dict_col);
 
+question_chisq_for_inputs = aq.from(question_chisq)
+  .select("subquestion_id", "label_major_y", "label_major_x")
+  .dedupe()
+
 //question_answers
 ```
 
 ## Question Filter
 
+::: { .custom-forms }
 ```{ojs}
 //| panel: input
-viewof question_select = Inputs.select(question_chisq, 
-  {format: d => '(' + d.subquestion_id + ') ' + d.label_major_y + ': ' +  d.label_major_x, sort:true, unique:true}, {label: "Question:"}
+
+viewof question_search = Inputs.search(question_chisq_for_inputs, { label: "Filter Questions:", autocomplete: true, placeholder: "Search question labels", format: (n_result) => { return `${n_result} matching questions found.` } })
+
+has_question_search_results = question_search == undefined || question_search.length === 0 ? false : true
+
+viewof question_select = Inputs.select(question_search, 
+  {label: "Select Question:", format: d => '(' + d.subquestion_id + ') ' + d.label_major_y + ': ' +  d.label_major_x, sort:true, unique:true}
 )
 
 // viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
@@ -158,7 +170,7 @@ viewof question_select = Inputs.select(question_chisq,
 
 
 ```
-
+:::
 
 
 ```{ojs}
@@ -337,17 +349,19 @@ return chartTwo;
 
 ## Diversity Filter
 
+::: { .custom-forms }
 ```{ojs}
 //| panel: input
-viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
+viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Select Diversity Group:", sort: true, unique: true})
 
 // calculate max cramer value for filter select
 cramer_vs = question_chisq.filter(d => d.diversity_group === diversity_select).map(obj => obj.cramer_v)
 max_cramer = Math.round(Math.max(...cramer_vs) * 100) / 100
 
-viewof cramer_v_select = Inputs.range([0, max_cramer - 0.001], {value: (max_cramer / 2), step: 0.01, label: "Cramer V"});
+viewof cramer_v_select = Inputs.range([0, max_cramer - 0.001], {value: (max_cramer / 2), step: 0.01, label: "Cramer V Threshold:"});
 
 ```
+:::
 
 ```{ojs}
 
