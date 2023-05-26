@@ -93,7 +93,11 @@ question_pol_reg_df <- question_pol_reg_df %>%
 ojs_define(question_pol_reg_col = question_pol_reg_df)
 
 ```
-#### Influence of Diversity Group on Answer Patterns
+
+
+::: {.callout-note collapse="true"}
+
+## Influence of Diversity Group on Answer Patterns
 
 The first plot shows the Cramer's V (X-Axis) for each diversity group (Y-Axis) in the selected answer. The Cramer's V statistic is a **measure of association used in contingency tables**, in this case as an effect size measure for chi-square tests. It is used to assess the strength of the association between two categorical variables. The Cramer's V ranges between 0 and 1, with 0 indicating no association and 1 indicating a perfect association.
 
@@ -124,9 +128,11 @@ Assuming the reference group is male, the coefficient for gender will represent 
 To interpret this result in a more intuitive way, we can exponentiate the coefficient to obtain an odds ratio. For example, if the exponentiated coefficient is 1.65, this means that the odds of moving up one level in severity are 1.65 times higher for females than for males, holding all other variables constant.
 
 It's important to note that the interpretation of the coefficient for a categorical variable like gender depends on the choice of reference group. If the reference group were female instead of male, the interpretation would be different, and the odds ratio would represent the change in odds for males compared to females or TIN*. Therefore, it's important to choose the reference group carefully and interpret the results accordingly.
-
+:::
 
 ```{ojs}
+import { aq, op } from '@uwdata/arquero'
+
 question_chisq = transpose(question_chisq_col)
 question_log_reg = transpose(question_log_reg_col)
 question_pol_reg = transpose(question_pol_reg_col)
@@ -138,15 +144,25 @@ question_answer_dict = transpose(question_answer_dict_col);
 diversity_items = transpose(diversity_items_col);
 diversity_answers_dict = transpose(diversity_answers_dict_col);
 
+question_chisq_for_inputs = aq.from(question_chisq)
+  .select("subquestion_id", "label_major_y", "label_major_x")
+  .dedupe()
+
 //question_answers
 ```
 
-# Question Filter
+## Question Filter
 
+::: { .custom-forms }
 ```{ojs}
 //| panel: input
-viewof question_select = Inputs.select(question_chisq, 
-  {format: d => '(' + d.subquestion_id + ') ' + d.label_major_y + ': ' +  d.label_major_x, sort:true, unique:true}, {label: "Question:"}
+
+viewof question_search = Inputs.search(question_chisq_for_inputs, { label: "Filter Questions:", autocomplete: true, placeholder: "Search question labels", format: (n_result) => { return `${n_result} matching questions found.` } })
+
+has_question_search_results = question_search == undefined || question_search.length === 0 ? false : true
+
+viewof question_select = Inputs.select(question_search, 
+  {label: "Select Question:", format: d => '(' + d.subquestion_id + ') ' + d.label_major_y + ': ' +  d.label_major_x, sort:true, unique:true}
 )
 
 // viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
@@ -154,7 +170,7 @@ viewof question_select = Inputs.select(question_chisq,
 
 
 ```
-
+:::
 
 
 ```{ojs}
@@ -168,7 +184,7 @@ filteredPolRegData = question_pol_reg.filter(d => d.subquestion_id === question_
 
 ```
 
-## Plot Subquestions
+### Plot Subquestions
 
 ```{ojs}
 Plotly = require("https://cdn.plot.ly/plotly-latest.min.js");
@@ -202,7 +218,7 @@ const wrappedText = caption_text.split(/\s+/g).reduce((lines, rawWord) => {
   
 
 
-var trace = {
+const trace = {
       y: filteredChisqData.map(function(d) { return d.diversity_group; }),
       x: filteredChisqData.map(function(d) { return d.cramer_v; }),
       type: 'scatter',
@@ -215,7 +231,7 @@ var trace = {
     }
 };
 
-  const layout = {
+const layout = {
   height: 800,
   width: 700,
   margin: {
@@ -254,10 +270,9 @@ var trace = {
 }
 
 
-  const chart = DOM.element('chart');
-    Plotly.newPlot(chart, [trace], layout);
-    return chart;
-
+const chart = DOM.element('chart');
+Plotly.newPlot(chart, [trace], layout);
+return chart;
 
 }
 ```
@@ -283,7 +298,7 @@ const estimateValues = plotData.map(function(d) { return d.estimate; });
 const maxXValue = Math.max(...estimateValues) + 1;
 const minXValue = Math.min(...estimateValues) - 1;
 
-var trace = {
+const trace = {
       y: plotData.map(function(d) { return d.term; }),
       x: plotData.map(function(d) { return d.estimate; }),
       type: 'scatter',
@@ -298,7 +313,7 @@ var trace = {
 
 
 
-  const layoutTwo = {
+const layoutTwo = {
     height: 800,
     width: 700,
     margin: {
@@ -324,39 +339,45 @@ var trace = {
 
 
 
-  const chartTwo = DOM.element('chart');
-    Plotly.newPlot(chartTwo, [trace], layoutTwo);
-    return chartTwo;
+const chartTwo = DOM.element('chart');
+Plotly.newPlot(chartTwo, [trace], layoutTwo);
+return chartTwo;
 
 }
 
 ```
 
-# Diversity Filter
+## Diversity Filter
 
+::: { .custom-forms }
 ```{ojs}
 //| panel: input
-viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Diversity Group", sort: true, unique: true})
+viewof diversity_select = Inputs.select(question_chisq.map(d => d.diversity_group), {label: "Select Diversity Group:", sort: true, unique: true})
 
-viewof cramer_v_select = Inputs.range([0, 1], {value: 0.3, step: 0.01, label: "Cramer V"})
+// calculate max cramer value for filter select
+cramer_vs = question_chisq.filter(d => d.diversity_group === diversity_select).map(obj => obj.cramer_v)
+max_cramer = Math.round(Math.max(...cramer_vs) * 100) / 100
 
-
+viewof cramer_v_select = Inputs.range([0, max_cramer - 0.001], {value: (max_cramer / 2), step: 0.01, label: "Cramer V Threshold:"});
 
 ```
+:::
 
 ```{ojs}
-//filter selected question
-filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select);
+
+// filter selected question
+filteredChisqData_div = question_chisq.filter(d => d.diversity_group === diversity_select && d.cramer_v >= cramer_v_select)
+
 ```
 
-## Plot Diversity Groups
+### Plot Diversity Groups
 
 ```{ojs}
 {
 
 filteredChisqData_div.sort((a, b) => (b.cramer_v > a.cramer_v) ? 1 : -1)
 
-var trace_div = {
+const trace_div = {
       x: filteredChisqData_div.map(function(d) { return d.subquestion_id; }),
       y: filteredChisqData_div.map(function(d) { return d.cramer_v; }),
       type: 'scatter',
@@ -369,7 +390,7 @@ var trace_div = {
     }
 };
 
-  const layout_div = {
+const layout_div = {
   height: 1000,
   width: 746,
   margin: {
@@ -395,10 +416,9 @@ var trace_div = {
 }
 
 
-  const chart_div = DOM.element('chart');
-    Plotly.newPlot(chart_div, [trace_div], layout_div);
-    return chart_div;
-
+const chart_div = DOM.element('chart');
+Plotly.newPlot(chart_div, [trace_div], layout_div);
+return chart_div;
 
 }
 ```
